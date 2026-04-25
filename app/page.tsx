@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageSquare, Dog, Sparkles, Shield, Zap, Heart } from 'lucide-react'
+import Image from "next/image"
+
 
 export default function HomePage() {
   const { isAuthenticated, isLoading, login } = useAuth()
@@ -66,6 +68,7 @@ export default function HomePage() {
       <section className="relative overflow-hidden bg-gradient-to-b from-muted/50 to-background py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 text-center">
           <div className="mx-auto max-w-3xl">
+            
             <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
               <Sparkles className="h-4 w-4" />
               Welcome to Campus Pup
@@ -180,7 +183,15 @@ export default function HomePage() {
 
       <section className="border-t bg-muted/30 py-20">
         <div className="mx-auto max-w-3xl px-4 text-center">
+                    <Image
+  src="/logo.png"
+  alt="Campus Pup Logo"
+  width={120}
+  height={120}
+  className="mx-auto mb-6"
+/>
           <h2 className="mb-4 text-3xl font-bold">Ready to Get Started?</h2>
+
           <p className="mb-8 text-lg text-muted-foreground">
             Sign in now to chat with AI and meet your new virtual campus companion!
           </p>
