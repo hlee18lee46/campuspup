@@ -8,7 +8,6 @@ import { Card } from '@/components/ui/card'
 import { GameUI } from '@/components/game/game-ui'
 import { Dog, Loader2 } from 'lucide-react'
 
-// Dynamically import the 3D scene to avoid SSR issues
 const GameScene = dynamic(
   () => import('@/components/game/game-scene').then((mod) => mod.GameScene),
   {
@@ -29,8 +28,8 @@ export default function DogGamePage() {
   const [happiness, setHappiness] = useState(50)
   const [totalPets, setTotalPets] = useState(0)
   const [level, setLevel] = useState(1)
+  const [walkMode, setWalkMode] = useState(false)
 
-  // Happiness decays over time
   useEffect(() => {
     const interval = setInterval(() => {
       setHappiness((prev) => Math.max(0, prev - 1))
@@ -39,7 +38,6 @@ export default function DogGamePage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Calculate level based on total pets
   useEffect(() => {
     const newLevel = Math.floor(totalPets / 20) + 1
     setLevel(newLevel)
@@ -77,9 +75,20 @@ export default function DogGamePage() {
 
   return (
     <div className="h-screen w-full pt-16 relative">
-      <GameUI happiness={happiness} totalPets={totalPets} level={level} />
+      <GameUI
+        happiness={happiness}
+        totalPets={totalPets}
+        level={level}
+        walkMode={walkMode}
+        onToggleWalkMode={() => setWalkMode((prev) => !prev)}
+      />
+
       <div className="h-full w-full">
-        <GameScene onPet={handlePet} happiness={happiness} />
+        <GameScene
+          onPet={handlePet}
+          happiness={happiness}
+          walkMode={walkMode}
+        />
       </div>
     </div>
   )

@@ -2,16 +2,25 @@
 
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Heart, Star, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Heart, Star, Sparkles, Footprints } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface GameUIProps {
   happiness: number
   totalPets: number
   level: number
+  walkMode: boolean
+  onToggleWalkMode: () => void
 }
 
-export function GameUI({ happiness, totalPets, level }: GameUIProps) {
+export function GameUI({
+  happiness,
+  totalPets,
+  level,
+  walkMode,
+  onToggleWalkMode,
+}: GameUIProps) {
   const getHappinessColor = () => {
     if (happiness >= 80) return 'text-green-500'
     if (happiness >= 50) return 'text-yellow-500'
@@ -30,8 +39,7 @@ export function GameUI({ happiness, totalPets, level }: GameUIProps) {
 
   return (
     <div className="absolute top-20 left-4 right-4 z-10 pointer-events-none">
-      <div className="flex flex-wrap gap-3 justify-between max-w-4xl mx-auto">
-        {/* Happiness Meter */}
+      <div className="flex flex-wrap gap-3 justify-between max-w-5xl mx-auto">
         <Card className="px-4 py-3 pointer-events-auto bg-background/90 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <Heart className={cn('h-6 w-6', getHappinessColor())} fill="currentColor" />
@@ -47,9 +55,7 @@ export function GameUI({ happiness, totalPets, level }: GameUIProps) {
           </div>
         </Card>
 
-        {/* Stats */}
-        <div className="flex gap-3">
-          {/* Total Pets */}
+        <div className="flex flex-wrap gap-3">
           <Card className="px-4 py-3 pointer-events-auto bg-background/90 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -60,7 +66,6 @@ export function GameUI({ happiness, totalPets, level }: GameUIProps) {
             </div>
           </Card>
 
-          {/* Level */}
           <Card className="px-4 py-3 pointer-events-auto bg-background/90 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-500" fill="currentColor" />
@@ -70,13 +75,21 @@ export function GameUI({ happiness, totalPets, level }: GameUIProps) {
               </div>
             </div>
           </Card>
+
+          <Card className="px-3 py-3 pointer-events-auto bg-background/90 backdrop-blur-sm">
+            <Button onClick={onToggleWalkMode} variant={walkMode ? 'default' : 'outline'}>
+              <Footprints className="mr-2 h-4 w-4" />
+              {walkMode ? 'Pet Mode' : 'Walk Mode'}
+            </Button>
+          </Card>
         </div>
       </div>
 
-      {/* Instructions */}
       <div className="mt-4 text-center">
         <p className="text-sm text-muted-foreground bg-background/80 backdrop-blur-sm inline-block px-4 py-2 rounded-lg">
-          Click and drag to orbit around the campus. Click on the pup to pet it!
+          {walkMode
+            ? 'Use W A S D to walk. Your pup will follow you!'
+            : 'Click and drag to orbit around the campus. Click on the pup to pet it!'}
         </p>
       </div>
     </div>

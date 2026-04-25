@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -11,21 +9,65 @@ import { useAuth } from '@/hooks/use-auth'
 import { Send, Bot, User, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+type ChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  text: string
+}
+
 export default function ChatPage() {
   const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+
   const { user, isAuthenticated, isLoading: authLoading, login } = useAuth()
-  
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
-  })
 
-  const isLoading = status === 'streaming' || status === 'submitted'
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
-    sendMessage({ text: input })
+
+    const text = input.trim()
+    if (!text || isLoading) return
+
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      text,
+    }
+
+    setMessages((prev) => [...prev, userMessage])
     setInput('')
+    setIsLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: text }),
+      })
+
+      const data = await res.json()
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        text: data.reply || data.error || 'No response',
+      }
+
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          text: 'Chat request failed.',
+        },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (authLoading) {
@@ -82,6 +124,7 @@ export default function ChatPage() {
                       </AvatarFallback>
                     </Avatar>
                   )}
+
                   <Card
                     className={cn(
                       'max-w-[80%] px-4 py-3',
@@ -90,15 +133,9 @@ export default function ChatPage() {
                         : 'bg-muted'
                     )}
                   >
-                    <div className="whitespace-pre-wrap">
-                      {message.parts.map((part, index) => {
-                        if (part.type === 'text') {
-                          return <span key={index}>{part.text}</span>
-                        }
-                        return null
-                      })}
-                    </div>
+                    <div className="whitespace-pre-wrap">{message.text}</div>
                   </Card>
+
                   {message.role === 'user' && (
                     <Avatar className="h-10 w-10 shrink-0">
                       <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
@@ -109,7 +146,8 @@ export default function ChatPage() {
                   )}
                 </div>
               ))}
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
+
+              {isLoading && (
                 <div className="flex gap-4">
                   <Avatar className="h-10 w-10 shrink-0">
                     <AvatarFallback className="bg-primary text-primary-foreground">

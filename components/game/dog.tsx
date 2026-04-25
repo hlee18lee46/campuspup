@@ -11,28 +11,50 @@ interface DogProps {
   happiness: number
 }
 
-export function Dog({ position = [0, 0, 0], onPet, happiness }: DogProps) {
+export function Dog({ position = [0, 0.8, 0], onPet, happiness }: DogProps) {
   const groupRef = useRef<THREE.Group>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPetting, setIsPetting] = useState(false)
   const [hovered, setHovered] = useState(false)
 
   const { scene } = useGLTF('/white_cartoon_dog.glb')
-
   const clonedScene = useMemo(() => scene.clone(), [scene])
+
+  const playPupSound = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/pup.m4a')
+      audioRef.current.volume = 0.7
+    }
+
+    audioRef.current.currentTime = 0
+    audioRef.current.play().catch(() => {})
+  }
 
   useFrame((state) => {
     if (!groupRef.current) return
 
     const time = state.clock.elapsedTime
-    groupRef.current.position.y = position[1] + Math.sin(time * 2) * 0.05
+
+    groupRef.current.position.x = THREE.MathUtils.lerp(
+      groupRef.current.position.x,
+      position[0],
+      0.08
+    )
+    groupRef.current.position.z = THREE.MathUtils.lerp(
+      groupRef.current.position.z,
+      position[2],
+      0.08
+    )
+    groupRef.current.position.y = position[1] + Math.sin(time * 2) * 0.03
 
     if (happiness > 50) {
-      groupRef.current.rotation.y = Math.sin(time * 8) * 0.1 * (happiness / 100)
+      groupRef.current.rotation.y =
+        Math.sin(time * 6) * 0.08 * (happiness / 100)
     }
 
     if (isPetting) {
-      groupRef.current.rotation.y = Math.sin(time * 15) * 0.15
-      groupRef.current.scale.setScalar(1.1 + Math.sin(time * 10) * 0.05)
+      groupRef.current.rotation.y = Math.sin(time * 12) * 0.12
+      groupRef.current.scale.setScalar(1.05 + Math.sin(time * 8) * 0.03)
     } else {
       groupRef.current.scale.setScalar(1)
     }
@@ -40,6 +62,7 @@ export function Dog({ position = [0, 0, 0], onPet, happiness }: DogProps) {
 
   const handlePointerDown = () => {
     setIsPetting(true)
+    playPupSound()
     onPet?.()
   }
 
@@ -51,8 +74,11 @@ export function Dog({ position = [0, 0, 0], onPet, happiness }: DogProps) {
     <group ref={groupRef} position={position}>
       <primitive
         object={clonedScene}
-        scale={0.5}
+        scale={0.08}
+        position={[0, 0, 0]}
         rotation={[0, Math.PI, 0]}
+        castShadow
+        receiveShadow
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
@@ -61,7 +87,7 @@ export function Dog({ position = [0, 0, 0], onPet, happiness }: DogProps) {
       />
 
       {hovered && (
-        <Html position={[0, 2, 0]} center>
+        <Html position={[0, 1.1, 0]} center>
           <div className="bg-background/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium shadow-lg pointer-events-none select-none">
             {isPetting ? 'Petting!' : 'Click to pet!'}
           </div>
@@ -70,9 +96,9 @@ export function Dog({ position = [0, 0, 0], onPet, happiness }: DogProps) {
 
       {isPetting && (
         <>
-          <Heart position={[0.5, 2.5, 0]} delay={0} />
-          <Heart position={[-0.5, 2.3, 0.2]} delay={0.2} />
-          <Heart position={[0, 2.7, -0.2]} delay={0.4} />
+          <Heart position={[0.3, 1.4, 0]} delay={0} />
+          <Heart position={[-0.3, 1.3, 0.2]} delay={0.2} />
+          <Heart position={[0, 1.5, -0.2]} delay={0.4} />
         </>
       )}
     </group>
@@ -92,18 +118,18 @@ function Heart({
     if (!ref.current) return
 
     const time = state.clock.elapsedTime + delay
-    ref.current.position.y = position[1] + Math.sin(time * 3) * 0.3
+    ref.current.position.y = position[1] + Math.sin(time * 3) * 0.2
     ref.current.rotation.y = time * 2
-    ref.current.scale.setScalar(0.8 + Math.sin(time * 5) * 0.2)
+    ref.current.scale.setScalar(0.6 + Math.sin(time * 5) * 0.15)
   })
 
   return (
     <mesh ref={ref} position={position}>
-      <sphereGeometry args={[0.1, 16, 16]} />
+      <sphereGeometry args={[0.08, 16, 16]} />
       <meshStandardMaterial
         color="#ef4444"
         emissive="#ef4444"
-        emissiveIntensity={0.5}
+        emissiveIntensity={0.6}
       />
     </mesh>
   )
