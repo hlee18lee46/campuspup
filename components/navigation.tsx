@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 // Added Camera icon for the Gallery
-import { MessageSquare, Dog, LogOut, User, Camera } from 'lucide-react'
+import { MessageSquare, Dog, LogOut, User, Camera, BrainCircuit } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function Navigation() {
@@ -24,6 +24,7 @@ export function Navigation() {
     { href: '/dog-game', label: 'Pet the Dog', icon: Dog },
     // New Gallery Item
     { href: '/gallery', label: 'Pup Gallery', icon: Camera },
+    { href: '/wellness-audit', label: 'Audit-Cortex', icon: BrainCircuit },
   ]
 
   return (

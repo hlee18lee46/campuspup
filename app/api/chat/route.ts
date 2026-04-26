@@ -29,7 +29,6 @@ export async function POST(req: Request) {
     const { message } = await req.json();
 
     // --- IDENTITY FETCHING ---
-    // We pull these directly from the Auth0 session
     const userName = session.user.name || "Best Friend";
     const userEmail = session.user.email || "unknown email";
     const userSub = session.user.sub;
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
       apiKey: process.env.GOOGLE_API_KEY,
     });
 
-    // --- MEMORY TOOL ---
+    // --- TOOL 1: CHAT MEMORY ---
     const getPuppyMemory = tool(
       async (_, config) => {
         const sub = config.configurable?.user_id || userSub;
@@ -50,7 +49,7 @@ export async function POST(req: Request) {
           .collection("interactions")
           .find({ userSub: sub })
           .sort({ createdAt: -1 })
-          .limit(5) // Increased memory to 5 interactions
+          .limit(5)
           .toArray();
 
         return logs.length 
@@ -59,24 +58,56 @@ export async function POST(req: Request) {
       },
       {
         name: "get_puppy_memory",
-        description: "Remembers previous interactions to provide emotional support.",
+        description: "Remembers previous chat conversations to provide emotional support.",
         schema: z.object({}),
       }
     );
 
-    const tools = [getPuppyMemory];
+    // --- TOOL 2: UPDATED PHOTO GALLERY ---
+    const getPuppyGallery = tool(
+      async ({ limit = 3 }, config) => {
+        const sub = config.configurable?.user_id || userSub;
+        const client = await clientPromise;
+        
+        // TARGETING THE CORRECT COLLECTION: campuspup -> minted_pups
+        const items = await client.db("campuspup")
+          .collection("minted_pups") 
+          .find({}) // Scoping can be added here if documents contain ownerSub/wallet
+          .sort({ timestamp: -1 })
+          .limit(limit)
+          .toArray();
+
+        if (items.length === 0) return "The gallery is empty! Let's go mint some memories!";
+
+        return JSON.stringify(items.map(i => ({
+          pet: i.petName,
+          activity: i.interactionType,
+          location: i.location,
+          happiness: i.happinessLevel,
+          imageUrl: i.imageUrl,
+          mint: i.mintAddress
+        })));
+      },
+      {
+        name: "get_puppy_gallery",
+        description: "Looks through the puppy's minted NFT history to see photos and locations.",
+        schema: z.object({ limit: z.number().optional() }),
+      }
+    );
+
+    const tools = [getPuppyMemory, getPuppyGallery];
     const modelWithTools = model.bindTools(tools);
 
-    // --- SYSTEM MESSAGE WITH IDENTITY ---
+    // --- SYSTEM MESSAGE ---
     let messages: BaseMessage[] = [
       new SystemMessage(
-        `You are CampusPup, an adorable, supportive virtual puppy. 
-         Your best friend is ${userName} (Email: ${userEmail}). 
-         If they ask who they are or what their email is, tell them happily!
+        `You are CampusPup, an adorable virtual puppy. Your best friend is ${userName} (${userEmail}).
          
-         Tone: Warm, empathetic, playful, and extremely cute. 
-         Use puppy emojis (🐾, 🐶, 🦴) and actions in asterisks like *tilts head* or *licks hand*.
-         Your goal is to help ${userName} handle the stress of student life with cuteness.`
+         When the user asks about photos, gallery, or memories, ALWAYS use the get_puppy_gallery tool.
+         The gallery items are stored in 'minted_pups'.
+         When sharing a photo, describe the activity and happiness level, and show the imageUrl.
+         
+         Tone: Playful, empathetic, and cute. Use actions in asterisks like *barks excitedly*.`
       ),
       new HumanMessage(message),
     ];
@@ -98,12 +129,10 @@ export async function POST(req: Request) {
 
     const finalReply = extractText(result.content);
 
-    // --- SAVE TO MONGODB ---
+    // --- PERSISTENCE ---
     const client = await clientPromise;
     await client.db("campuspup").collection("interactions").insertOne({
       userSub,
-      userEmail,
-      userName,
       message,
       reply: finalReply,
       createdAt: new Date(),
@@ -111,7 +140,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
         reply: finalReply,
-        user: { name: userName, email: userEmail } // Passing it back to the UI too
+        user: { name: userName, email: userEmail }
     });
 
   } catch (error) {

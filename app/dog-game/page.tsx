@@ -34,6 +34,8 @@ export default function DogGamePage() {
   const [messages, setMessages] = useState<{role: 'user' | 'buddy', text: string}[]>([])
   
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Ref to track the waiting audio so we can stop it across try/catch
+  const waitingAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Auto-scroll chat window
   useEffect(() => {
@@ -79,6 +81,12 @@ export default function DogGamePage() {
     setIsSpeaking(true)
     setMessages(prev => [...prev, { role: 'user', text: input }])
 
+    // --- START WAITING SOUND ---
+    const waitingAudio = new Audio('/pup.m4a')
+    waitingAudio.loop = true
+    waitingAudioRef.current = waitingAudio
+    waitingAudio.play().catch(() => console.log("Waiting sound blocked by browser"))
+
     try {
       // 1. Get Gemma Response
       const gemmaRes = await fetch('/api/chat-pup', {
@@ -87,6 +95,13 @@ export default function DogGamePage() {
         body: JSON.stringify({ message: input }),
       })
       const gemmaData = await gemmaRes.json()
+      
+      // --- STOP WAITING SOUND ---
+      if (waitingAudioRef.current) {
+        waitingAudioRef.current.pause()
+        waitingAudioRef.current = null
+      }
+
       const buddyText = gemmaData.text
 
       if (!buddyText) throw new Error("Buddy has no words...")
@@ -111,6 +126,11 @@ export default function DogGamePage() {
       audio.play()
 
     } catch (error: any) {
+      // Ensure audio stops even on error
+      if (waitingAudioRef.current) {
+        waitingAudioRef.current.pause()
+        waitingAudioRef.current = null
+      }
       setMessages(prev => [...prev, { role: 'buddy', text: `(Whimper) ${error.message}` }])
     } finally {
       setIsSpeaking(false)
@@ -151,7 +171,7 @@ export default function DogGamePage() {
               {m.text}
             </div>
           ))}
-          {isSpeaking && <div className="text-[10px] animate-pulse">Buddy is barking...</div>}
+          {isSpeaking && <div className="text-[10px] animate-pulse">Buddy is thinking...</div>}
         </div>
 
         <form onSubmit={handleChat} className="p-4 border-t flex gap-2">
