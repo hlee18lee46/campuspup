@@ -18,6 +18,7 @@
     "@langchain/community": "^1.1.27",
     "@langchain/core": "^1.1.41",
     "@langchain/google-genai": "^2.1.28",
+    "@langchain/langgraph": "^1.2.9",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@metaplex-foundation/umi": "^1.5.1",
     "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
@@ -78,7 +79,7 @@
     "tailwind-merge": "^3.3.1",
     "three": "^0.184.0",
     "vaul": "^1.1.2",
-    "zod": "^3.24.1"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.0",

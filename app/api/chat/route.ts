@@ -1,214 +1,121 @@
 import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { google } from "googleapis";
+import { 
+  BaseMessage, 
+  HumanMessage, 
+  SystemMessage, 
+  ToolMessage 
+} from "@langchain/core/messages";
+import { tool } from "@langchain/core/tools";
+import { Auth0AI } from "@auth0/ai-langchain";
+import { z } from "zod";
+import clientPromise from "@/lib/mongodb";
+
+function extractText(content: any): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const textPart = content.find((part: any) => part.type === "text");
+    return typeof textPart?.text === "string" ? textPart.text : JSON.stringify(content);
+  }
+  return "🐾 *Wags tail*";
+}
 
 export async function POST(req: Request) {
   try {
     const session = await auth0.getSession();
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { message } = await req.json();
 
-    const body = await req.json();
-    const message = body?.message?.trim();
+    // --- IDENTITY FETCHING ---
+    // We pull these directly from the Auth0 session
+    const userName = session.user.name || "Best Friend";
+    const userEmail = session.user.email || "unknown email";
+    const userSub = session.user.sub;
 
-    if (!message) {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 }
-      );
-    }
-
-    const userEmail = session.user.email ?? "unknown";
-    const userName = session.user.name ?? "unknown";
-    const userSub = session.user.sub ?? "unknown";
-    const lowerMessage = message.toLowerCase();
-
-    if (lowerMessage.includes("who am i")) {
-      return NextResponse.json({
-        reply: `You are ${userName !== "unknown" ? userName : userEmail}.`,
-      });
-    }
-
-    if (
-      lowerMessage.includes("gmail") ||
-      lowerMessage.includes("canvas email") ||
-      lowerMessage.includes("canvas emails")
-    ) {
-      const { accessToken } = await auth0.getAccessTokenForConnection({
-        connection: "google-oauth2",
-      });
-
-      if (!accessToken) {
-        return NextResponse.json(
-          {
-            error:
-              "No Google access token found. Re-login with Google and approve Gmail.Readonly permission.",
-          },
-          { status: 401 }
-        );
-      }
-
-      const oauth2Client = new google.auth.OAuth2();
-      oauth2Client.setCredentials({
-        access_token: accessToken,
-      });
-
-      const gmail = google.gmail({
-        version: "v1",
-        auth: oauth2Client,
-      });
-
-      const list = await gmail.users.messages.list({
-        userId: "me",
-        q: '(canvas OR instructure OR "Canvas") newer_than:60d',
-        maxResults: 5,
-      });
-
-      const messages = list.data.messages ?? [];
-
-      if (messages.length === 0) {
-        return NextResponse.json({
-          reply: "I checked your Gmail, but I did not find recent Canvas emails.",
-        });
-      }
-
-      const emailSummaries = await Promise.all(
-        messages.map(async (msg) => {
-          const full = await gmail.users.messages.get({
-            userId: "me",
-            id: msg.id!,
-            format: "metadata",
-            metadataHeaders: ["From", "Subject", "Date"],
-          });
-
-          const headers = full.data.payload?.headers ?? [];
-
-          const from =
-            headers.find((h) => h.name?.toLowerCase() === "from")?.value ??
-            "Unknown sender";
-
-          const subject =
-            headers.find((h) => h.name?.toLowerCase() === "subject")?.value ??
-            "No subject";
-
-          const date =
-            headers.find((h) => h.name?.toLowerCase() === "date")?.value ??
-            "Unknown date";
-
-          return {
-            from,
-            subject,
-            date,
-            snippet: full.data.snippet ?? "",
-          };
-        })
-      );
-
-      const model = new ChatGoogleGenerativeAI({
-        model: "gemma-4-26b-a4b-it",
-        temperature: 0.2,
-        apiKey: process.env.GOOGLE_API_KEY,
-      });
-
-      const response = await model.invoke([
-        new SystemMessage(
-          "You are RoboTrack, a secure Auth0 AI assistant. Summarize Gmail results concisely. Never expose data from other users."
-        ),
-        new HumanMessage(
-          `Authenticated user:
-email: ${userEmail}
-name: ${userName}
-sub: ${userSub}
-
-The user asked:
-${message}
-
-Recent Canvas-related Gmail messages:
-${JSON.stringify(emailSummaries, null, 2)}
-
-Summarize these emails clearly.`
-        ),
-      ]);
-
-      const reply =
-        typeof response.content === "string"
-          ? response.content.replace(/\n+/g, " ").trim()
-          : JSON.stringify(response.content);
-
-      return NextResponse.json({
-        reply,
-        emails: emailSummaries,
-        auth0AiAgent: {
-          tokenVault: true,
-          connection: "google-oauth2",
-          scope: "gmail.readonly",
-        },
-      });
-    }
-
-    console.log("Authenticated user:", userSub);
-
+    const auth0AI = new Auth0AI();
     const model = new ChatGoogleGenerativeAI({
       model: "gemma-4-26b-a4b-it",
-      temperature: 0.2,
+      temperature: 0.8, 
       apiKey: process.env.GOOGLE_API_KEY,
     });
 
-    const response = await model.invoke([
+    // --- MEMORY TOOL ---
+    const getPuppyMemory = tool(
+      async (_, config) => {
+        const sub = config.configurable?.user_id || userSub;
+        const client = await clientPromise;
+        const logs = await client.db("campuspup")
+          .collection("interactions")
+          .find({ userSub: sub })
+          .sort({ createdAt: -1 })
+          .limit(5) // Increased memory to 5 interactions
+          .toArray();
+
+        return logs.length 
+          ? JSON.stringify(logs.map(l => ({ userSays: l.message, puppySaid: l.reply }))) 
+          : "This is our first time playing together!";
+      },
+      {
+        name: "get_puppy_memory",
+        description: "Remembers previous interactions to provide emotional support.",
+        schema: z.object({}),
+      }
+    );
+
+    const tools = [getPuppyMemory];
+    const modelWithTools = model.bindTools(tools);
+
+    // --- SYSTEM MESSAGE WITH IDENTITY ---
+    let messages: BaseMessage[] = [
       new SystemMessage(
-        "You are RoboTrack, a secure AI assistant protected by Auth0. Always respond concisely and helpfully. Use the authenticated user's identity when relevant. Never expose other users' data."
+        `You are CampusPup, an adorable, supportive virtual puppy. 
+         Your best friend is ${userName} (Email: ${userEmail}). 
+         If they ask who they are or what their email is, tell them happily!
+         
+         Tone: Warm, empathetic, playful, and extremely cute. 
+         Use puppy emojis (🐾, 🐶, 🦴) and actions in asterisks like *tilts head* or *licks hand*.
+         Your goal is to help ${userName} handle the stress of student life with cuteness.`
       ),
-      new HumanMessage(
-        `Authenticated user:
-email: ${userEmail}
-name: ${userName}
-sub: ${userSub}
+      new HumanMessage(message),
+    ];
 
-User request:
-${message}`
-      ),
-    ]);
+    // --- AGENTIC LOOP ---
+    let result = await modelWithTools.invoke(messages);
 
-    let reply = "";
-
-    if (typeof response.content === "string") {
-      reply = response.content;
-    } else if (Array.isArray(response.content)) {
-      const textPart = response.content.find(
-        (part: any) => part.type === "text"
-      );
-
-      reply =
-        typeof textPart?.text === "string"
-          ? textPart.text
-          : JSON.stringify(textPart?.text ?? "No response");
-    } else {
-      reply = "No response";
+    while (result.tool_calls && result.tool_calls.length > 0) {
+      messages.push(result);
+      for (const toolCall of result.tool_calls) {
+        const selectedTool = tools.find((t) => t.name === toolCall.name);
+        if (selectedTool) {
+          const toolResponse = await (selectedTool as any).invoke(toolCall.args);
+          messages.push(new ToolMessage({ tool_call_id: toolCall.id!, content: toolResponse }));
+        }
+      }
+      result = await modelWithTools.invoke(messages);
     }
 
-    reply = reply.replace(/\n+/g, " ").trim();
+    const finalReply = extractText(result.content);
 
-    return NextResponse.json({
-      reply,
-      user: {
-        email: userEmail,
-        name: userName,
-        sub: userSub,
-      },
+    // --- SAVE TO MONGODB ---
+    const client = await clientPromise;
+    await client.db("campuspup").collection("interactions").insertOne({
+      userSub,
+      userEmail,
+      userName,
+      message,
+      reply: finalReply,
+      createdAt: new Date(),
     });
-  } catch (error) {
-    console.error("Agent error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          "Model call failed. Check GOOGLE_API_KEY, Gmail permission, Token Vault connection, and model name.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+        reply: finalReply,
+        user: { name: userName, email: userEmail } // Passing it back to the UI too
+    });
+
+  } catch (error) {
+    console.error("CampusPup Error:", error);
+    return NextResponse.json({ error: "CampusPup is taking a nap (Error)." }, { status: 500 });
   }
 }
