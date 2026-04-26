@@ -11,7 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MessageSquare, Dog, LogOut, User } from 'lucide-react'
+// Added Camera icon for the Gallery
+import { MessageSquare, Dog, LogOut, User, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function Navigation() {
@@ -21,6 +22,8 @@ export function Navigation() {
   const navItems = [
     { href: '/chat', label: 'AI Chat', icon: MessageSquare },
     { href: '/dog-game', label: 'Pet the Dog', icon: Dog },
+    // New Gallery Item
+    { href: '/gallery', label: 'Pup Gallery', icon: Camera },
   ]
 
   return (
@@ -68,7 +71,7 @@ export function Navigation() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <div className="flex items-center gap-2 p-2">
+                <div className="flex items-center gap-2 p-2 border-b">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
                     <AvatarFallback>
@@ -77,9 +80,20 @@ export function Navigation() {
                   </Avatar>
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{user?.name}</span>
-                    <span className="text-xs text-muted-foreground">{user?.email}</span>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                      {user?.email}
+                    </span>
                   </div>
                 </div>
+                
+                {/* Optional: Add Gallery to dropdown as well for mobile/extra access */}
+                <Link href="/gallery">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Camera className="mr-2 h-4 w-4" />
+                    My Moments
+                  </DropdownMenuItem>
+                </Link>
+
                 <DropdownMenuItem onClick={logout} className="text-destructive cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out

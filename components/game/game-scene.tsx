@@ -31,7 +31,6 @@ function FirstPersonController({
     const down = (e: KeyboardEvent) => {
       keys.current[e.key.toLowerCase()] = true
     }
-
     const up = (e: KeyboardEvent) => {
       keys.current[e.key.toLowerCase()] = false
     }
@@ -52,9 +51,7 @@ function FirstPersonController({
       return
     }
 
-    const moving =
-      keys.current.w || keys.current.a || keys.current.s || keys.current.d
-
+    const moving = keys.current.w || keys.current.a || keys.current.s || keys.current.d
     if (moving) {
       breatheAudio.current?.play().catch(() => {})
     } else {
@@ -62,7 +59,6 @@ function FirstPersonController({
     }
 
     const speed = 0.08
-
     const forward = new THREE.Vector3()
     camera.getWorldDirection(forward)
     forward.y = 0
@@ -98,18 +94,17 @@ function FirstPersonController({
 }
 
 export function GameScene({ onPet, happiness, walkMode }: GameSceneProps) {
-  const [dogPosition, setDogPosition] = useState<[number, number, number]>([
-    0, 0.8, 0,
-  ])
+  const [dogPosition, setDogPosition] = useState<[number, number, number]>([0, 0.8, 0])
 
   return (
     <Canvas
       shadows
+      // CRITICAL: preserveDrawingBuffer allows us to take a screenshot via canvas.toBlob()
+      gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ position: [5, 3, 8], fov: 50 }}
       style={{ background: '#87CEEB' }}
     >
       <ambientLight intensity={1.2} />
-
       <directionalLight
         position={[10, 15, 10]}
         intensity={2}
@@ -117,16 +112,10 @@ export function GameScene({ onPet, happiness, walkMode }: GameSceneProps) {
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
-
       <hemisphereLight args={['#87CEEB', '#4ade80', 0.8]} />
-
       <Sky sunPosition={[100, 20, 100]} turbidity={0.3} rayleigh={0.5} />
 
-      <FirstPersonController
-        walkMode={walkMode}
-        onDogMove={setDogPosition}
-      />
-
+      <FirstPersonController walkMode={walkMode} onDogMove={setDogPosition} />
       {walkMode && <PointerLockControls />}
 
       <Suspense fallback={null}>
@@ -135,12 +124,7 @@ export function GameScene({ onPet, happiness, walkMode }: GameSceneProps) {
           onPet={onPet}
           happiness={happiness}
         />
-
-        <mesh
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, -0.05, 0]}
-          receiveShadow
-        >
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
           <planeGeometry args={[20, 20]} />
           <meshStandardMaterial color="#7ccf6b" />
         </mesh>
