@@ -11,6 +11,7 @@ import { tool } from "@langchain/core/tools";
 import { Auth0AI } from "@auth0/ai-langchain";
 import { z } from "zod";
 import clientPromise from "@/lib/mongodb";
+import { getMyHistoryTool } from "@/lib/tools/get-my-history";
 
 export async function POST(req: Request) {
   try {
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
       }
     );
 
-    const tools = [getPuppyMemory];
+    const tools = [getPuppyMemory, getMyHistoryTool];
     const modelWithTools = model.bindTools(tools);
 
     // 3. System Message (Strict TTS-friendly rules)
